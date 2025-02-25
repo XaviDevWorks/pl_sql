@@ -184,3 +184,69 @@ END;
 --Para ejecutarlo
 EXEC normalizar_datos(1); -- Normaliza los datos de la persona con ID 1
 
+--6
+-- Crear la tabla LSCloud con servidores y usuarios
+CREATE TABLE LSCloud (
+    id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    servername VARCHAR2(100),
+    nick VARCHAR2(50),
+    location VARCHAR2(50)
+);
+
+-- Insertamos datos de prueba
+INSERT INTO LSCloud (servername, nick, location) VALUES ('Srv-Ireland-01', 'UserX', 'Irlanda');
+INSERT INTO LSCloud (servername, nick, location) VALUES ('Srv-Ireland-02', 'UserY', 'Irlanda');
+INSERT INTO LSCloud (servername, nick, location) VALUES ('Srv-Spain-01', 'UserZ', 'España');
+
+COMMIT;
+
+CREATE OR REPLACE PROCEDURE lsCloudLocation(
+    p_location IN VARCHAR2,
+    p_count OUT NUMBER
+) AS
+    v_file UTL_FILE.FILE_TYPE;
+    v_filename VARCHAR2(100);
+    v_servername LSCloud.servername%TYPE;
+    v_nick LSCloud.nick%TYPE;
+    CURSOR cur_servers IS 
+        SELECT servername, nick FROM LSCloud WHERE location = p_location;
+BEGIN
+    -- Generar el nombre del archivo con la fecha actual
+    v_filename := 'location_' || p_location || '_' || TO_CHAR(SYSDATE, 'YYYY-MM-DD') || '.txt';
+
+    -- Abrimos el archivo en modo escritura (cambiar ruta según UTL_FILE_DIR permitido)
+    v_file := UTL_FILE.FOPEN('/ruta/completa/', v_filename, 'W');
+
+    -- Inicializamos contador
+    p_count := 0;
+
+    -- Recorremos los servidores de la localización dada
+    FOR r IN cur_servers LOOP
+        UTL_FILE.PUT_LINE(v_file, r.servername || ' - ' || r.nick);
+        p_count := p_count + 1;
+    END LOOP;
+
+    -- Si no hay servidores, escribimos "Localización no válida!"
+    IF p_count = 0 THEN
+        UTL_FILE.PUT_LINE(v_file, 'Localización no válida!');
+    END IF;
+
+    -- Cerramos el archivo
+    UTL_FILE.FCLOSE(v_file);
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Cerrar archivo en caso de error
+        IF UTL_FILE.IS_OPEN(v_file) THEN
+            UTL_FILE.FCLOSE(v_file);
+        END IF;
+        RAISE;
+END;
+/
+--Para ejecutarlo
+DECLARE
+    v_count NUMBER;
+BEGIN
+    lsCloudLocation('Irlanda', v_count);
+    DBMS_OUTPUT.PUT_LINE('Servidores encontrados: ' || v_count);
+END;
+/
